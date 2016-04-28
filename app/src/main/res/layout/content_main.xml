@@ -27,15 +27,19 @@
             android:cursorVisible="false"
             android:layout_weight="9" />
         <ImageButton
+            android:id="@+id/btnSearch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:src="@drawable/places_ic_search"
             android:layout_weight="1"
+            android:onClick="findAddressOnMap"
             />
         <Button
+            android:id="@+id/btnStart"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:onClick="startGeofenceTrack"
             android:text="START" />
     </LinearLayout>
     <LinearLayout
