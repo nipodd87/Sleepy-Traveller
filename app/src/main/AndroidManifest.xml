@@ -33,6 +33,7 @@
         </activity>
         <service android:name=".GeocoderIntentService"
             android:exported="false" />
+        <service android:name=".GeofenceTransitionsIntentService" android:exported="false"/>
         <meta-data
             android:name="com.google.android.maps.v2.API_KEY"
             android:value="AIzaSyBvbw_lixjk9qI2SMkspYTgZOsE7szCgZw"/>
