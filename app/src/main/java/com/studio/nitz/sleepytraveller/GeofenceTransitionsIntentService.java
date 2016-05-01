@@ -1,14 +1,11 @@
 package com.studio.nitz.sleepytraveller;
 
+import android.app.AlarmManager;
 import android.app.IntentService;
-import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.BitmapFactory;
-import android.graphics.Color;
-import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.TaskStackBuilder;
 import android.text.TextUtils;
 import android.widget.Toast;
@@ -26,6 +23,9 @@ public class GeofenceTransitionsIntentService extends IntentService{
      *
      * @param name Used to name the worker thread, important only for debugging.
      */
+
+    private PendingIntent pi;
+    private AlarmManager am;
 
     public GeofenceTransitionsIntentService() {
         super("GeofenceIntentService");
@@ -85,7 +85,15 @@ public class GeofenceTransitionsIntentService extends IntentService{
     }
     private void sendNotification(String notificationDetails) {
         // Create an explicit content Intent that starts the main Activity.
-        Intent notificationIntent = new Intent(getApplicationContext(), MainActivity.class);
+        Intent alarmIntent = new Intent(getApplicationContext(), AlarmReceiver.class);
+        TaskStackBuilder stackBuilder = TaskStackBuilder.create(this);
+        stackBuilder.addParentStack(MainActivity.class);
+        stackBuilder.addNextIntent(alarmIntent);
+        pi = PendingIntent.getActivity(this, 2, alarmIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+        am = (AlarmManager) getSystemService(ALARM_SERVICE);
+        am.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), pi);
+
+    /*    Intent notificationIntent = new Intent(getApplicationContext(), MainActivity.class);
 
         // Construct a task stack.
         TaskStackBuilder stackBuilder = TaskStackBuilder.create(this);
@@ -122,7 +130,7 @@ public class GeofenceTransitionsIntentService extends IntentService{
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
         // Issue the notification
-        mNotificationManager.notify(0, builder.build());
+        mNotificationManager.notify(0, builder.build());  */
     }
 
     private String getTransitionString(int transitionType) {

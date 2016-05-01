@@ -21,4 +21,5 @@ public class SleepyTraveller extends Application {
                 .setIcon(R.drawable.icon_alert)
                 .show();
     }
+
 }

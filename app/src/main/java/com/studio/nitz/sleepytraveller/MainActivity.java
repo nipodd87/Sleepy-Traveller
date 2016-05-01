@@ -1,26 +1,38 @@
 package com.studio.nitz.sleepytraveller;
 
 import android.Manifest;
+import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.Geofence;
@@ -28,6 +40,10 @@ import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResult;
+import com.google.android.gms.location.LocationSettingsStates;
+import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.location.places.Places;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -38,6 +54,7 @@ import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements
@@ -61,6 +78,9 @@ public class MainActivity extends AppCompatActivity implements
     protected ArrayList<Geofence> mGeofenceList;
     private PendingIntent mGeofencePendingIntent;
     private boolean isAddressLocated;
+    private static final int REQUEST_CHECK_SETTINGS = 0x1;
+    public int selectedTone;
+    private AlertDialog alert;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -74,6 +94,7 @@ public class MainActivity extends AppCompatActivity implements
         btnStart = (Button) findViewById(R.id.btnStart);
         btnStop = (Button) findViewById(R.id.btnStop);
         mSharedPreferences = getSharedPreferences(Constants.SHARED_PREFERENCES_NAME, MODE_PRIVATE);
+        selectedTone = mSharedPreferences.getInt(Constants.ALARM_TONE_KEY, 0);
         mGeofenceAdded = mSharedPreferences.getBoolean(Constants.GEOFENCE_ADDED_KEY, false);
         setButtonsEnabledState();
         map = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map)).getMap();
@@ -88,6 +109,46 @@ public class MainActivity extends AppCompatActivity implements
         });
         geocodeReceiver = new GeocodeReceiver(new Handler());
         geocodeReceiver.setReceiver(this);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.alarm_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        final String[] selectTone = new String[]{"Digital Alarm Clock", "Kalinka", "Synth dreams", "Final Destination", "Piano Dreams", "Wake Up Song"};
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Choose your alarm style");
+        builder.setIcon(R.drawable.sleepy_icon);
+        builder.setSingleChoiceItems(selectTone, selectedTone, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                selectedTone = which;
+                }
+        });
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                SharedPreferences.Editor editor = mSharedPreferences.edit();
+                editor.putInt(Constants.ALARM_TONE_KEY, selectedTone);
+                editor.apply();
+                dialog.dismiss();
+            }
+        });
+        builder.setNegativeButton("CANCEL", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                selectedTone = mSharedPreferences.getInt(Constants.ALARM_TONE_KEY, 0);
+                dialog.dismiss();
+            }
+        });
+        alert = builder.create();
+        alert.show();
+        return true;
 
     }
 
@@ -100,6 +161,7 @@ public class MainActivity extends AppCompatActivity implements
                     .addApi(Places.GEO_DATA_API)
                     .build();
             createLocationRequest();
+            checkLocationRequest();
         }
     }
 
@@ -108,6 +170,55 @@ public class MainActivity extends AppCompatActivity implements
         mLocationRequest.setInterval(Constants.UPDATE_INTERVAL_IN_MILLISECONDS);
         mLocationRequest.setFastestInterval(Constants.FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS);
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+    }
+
+    protected void checkLocationRequest(){
+        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
+                                            .addLocationRequest(mLocationRequest);
+        final PendingResult<LocationSettingsResult> result = LocationServices.SettingsApi.checkLocationSettings(mGoogleApiClient,
+                builder.build());
+        result.setResultCallback(new ResultCallback<LocationSettingsResult>() {
+            @Override
+            public void onResult(LocationSettingsResult locationSettingsResult) {
+                final Status status = locationSettingsResult.getStatus();
+                final LocationSettingsStates states= locationSettingsResult.getLocationSettingsStates();
+                switch (status.getStatusCode()) {
+                    case LocationSettingsStatusCodes.SUCCESS:
+                        break;
+                    case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+                        // Location settings are not satisfied, but this can be fixed
+                        // by showing the user a dialog.
+                        try {
+                            // Show the dialog by calling startResolutionForResult(),
+                            // and check the result in onActivityResult().
+                            status.startResolutionForResult(
+                                    MainActivity.this,
+                                    REQUEST_CHECK_SETTINGS);
+                        } catch (IntentSender.SendIntentException e) {
+                            // Ignore the error.
+                        }
+                        break;
+                    case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
+                        break;
+                }
+            }
+        });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        switch (requestCode) {
+            // Check for the integer request code originally supplied to startResolutionForResult().
+            case REQUEST_CHECK_SETTINGS:
+                switch (resultCode) {
+                    case Activity.RESULT_OK:
+                        startLocationUpdates();
+                        break;
+                    case Activity.RESULT_CANCELED:
+                        break;
+                }
+                break;
+        }
     }
 
     @Override
@@ -263,7 +374,7 @@ public class MainActivity extends AppCompatActivity implements
         LatLng latLng = new LatLng(latitude, longitude);
         map.addMarker(new MarkerOptions().position(latLng).icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
         map.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-        map.animateCamera(CameraUpdateFactory.zoomTo(14), 3000, null);
+        map.animateCamera(CameraUpdateFactory.zoomTo(14), 2000, null);
         CircleOptions circleOptions = new CircleOptions()
                                             .center(latLng)
                                             .fillColor(0x40ff0000)
@@ -308,10 +419,18 @@ public class MainActivity extends AppCompatActivity implements
     public void setButtonsEnabledState(){
         if (mGeofenceAdded){
             btnStart.setEnabled(false);
+            btnStart.setAlpha(.3f);
+            btnStart.setClickable(false);
             btnStop.setEnabled(true);
+            btnStop.setAlpha(1f);
+            btnStop.setClickable(true);
         }else {
             btnStart.setEnabled(true);
             btnStop.setEnabled(false);
+            btnStop.setAlpha(.3f);
+            btnStop.setClickable(false);
+            btnStart.setAlpha(1f);
+            btnStart.setClickable(true);
         }
     }
 
@@ -330,9 +449,4 @@ public class MainActivity extends AppCompatActivity implements
             Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show();
         }
     }
-    // @Override
-  //  protected void onSaveInstanceState(Bundle savedInstanceState) {
-    //    savedInstanceState.putParcelable("LOCATION-KEY", mLastLocation);
-      //  super.onSaveInstanceState(savedInstanceState);
-  //  }
 }
