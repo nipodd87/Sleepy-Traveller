@@ -2,17 +2,15 @@ package com.studio.nitz.sleepytraveller;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
-import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
+import android.os.Vibrator;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-
 import java.io.IOException;
 
 /**
@@ -22,10 +20,13 @@ public class AlarmReceiver extends Activity {
     private MediaPlayer mMediaPlayer;
     private PowerManager.WakeLock mWakeLock;
     public int userSelectedTone;
+    private Vibrator vibrator;
+    private long[] pattern = {0, 100, 1000};
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+        vibrator = (Vibrator) getApplicationContext().getSystemService(Context.VIBRATOR_SERVICE);
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         mWakeLock = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK, "My Wake Lock");
         mWakeLock.acquire();
@@ -39,15 +40,17 @@ public class AlarmReceiver extends Activity {
         setContentView(R.layout.receiver_alarm);
         getWindow().setFeatureInt(Window.FEATURE_CUSTOM_TITLE, R.layout.window_layout);
         playSound(this);
-        //playSound(this, getAlarmUri());
-
     }
     public void stopAlarm(View v){
         mMediaPlayer.stop();
-        mWakeLock.release();
+        if (mWakeLock.isHeld()){
+            mWakeLock.release();
+        }
+        vibrator.cancel();
         finish();
     }
     protected void playSound(Context context){
+        vibrator.vibrate(pattern, 0);
         mMediaPlayer = new MediaPlayer();
         final AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
         if (audioManager.getStreamVolume(AudioManager.STREAM_ALARM) != 0) {
@@ -62,12 +65,6 @@ public class AlarmReceiver extends Activity {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            /* try {
-                mMediaPlayer.prepare();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }  */
-
         }
     }
     public static int getSelectedAlarmTone(int selectedItem) {
@@ -96,32 +93,6 @@ public class AlarmReceiver extends Activity {
         }
         return userSelectedTone;
     }
-    /*  protected void playSound(Context context, Uri alert) {
-          mMediaPlayer = new MediaPlayer();
-          try {
-              mMediaPlayer.setDataSource(context, alert);
-              final AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-
-              if (audioManager.getStreamVolume(AudioManager.STREAM_ALARM) != 0) {
-                  mMediaPlayer.setAudioStreamType(AudioManager.STREAM_ALARM);
-                  mMediaPlayer.prepare();
-                  mMediaPlayer.start();
-              }
-          } catch (IOException e) {
-              e.printStackTrace();
-          }
-      } */
-    private Uri getAlarmUri(){
-        Uri alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-        if (alert == null){
-            alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-        }
-        if (alert == null){
-            alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-        }
-        return alert;
-    }
-
     protected void onStop(){
         super.onStop();
         if (mWakeLock.isHeld())

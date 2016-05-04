@@ -1,20 +1,15 @@
 package com.studio.nitz.sleepytraveller;
 
 import android.Manifest;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentSender;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
-import android.media.AudioManager;
-import android.media.MediaPlayer;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
@@ -25,14 +20,12 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.Geofence;
@@ -40,10 +33,6 @@ import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.LocationSettingsRequest;
-import com.google.android.gms.location.LocationSettingsResult;
-import com.google.android.gms.location.LocationSettingsStates;
-import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.location.places.Places;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -53,13 +42,11 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
-
-import java.io.IOException;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, GeocodeReceiver.Receiver
-        , LocationListener, ResultCallback<Status> {
+        , LocationListener, ResultCallback<Status>, ActivityCompat.OnRequestPermissionsResultCallback {
 
     private EditText addressTxt;
     private String addressInput;
@@ -81,6 +68,8 @@ public class MainActivity extends AppCompatActivity implements
     private static final int REQUEST_CHECK_SETTINGS = 0x1;
     public int selectedTone;
     private AlertDialog alert;
+    private static String[] PERMISSIONS_LOCATION = {Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION};
+    private static final int REQUEST_LOCATION = 100;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -109,6 +98,9 @@ public class MainActivity extends AppCompatActivity implements
         });
         geocodeReceiver = new GeocodeReceiver(new Handler());
         geocodeReceiver.setReceiver(this);
+        btnStart.setEnabled(false);
+        btnStart.setAlpha(.3f);
+        btnStart.setClickable(false);
     }
 
     @Override
@@ -161,7 +153,6 @@ public class MainActivity extends AppCompatActivity implements
                     .addApi(Places.GEO_DATA_API)
                     .build();
             createLocationRequest();
-            checkLocationRequest();
         }
     }
 
@@ -172,54 +163,6 @@ public class MainActivity extends AppCompatActivity implements
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
     }
 
-    protected void checkLocationRequest(){
-        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
-                                            .addLocationRequest(mLocationRequest);
-        final PendingResult<LocationSettingsResult> result = LocationServices.SettingsApi.checkLocationSettings(mGoogleApiClient,
-                builder.build());
-        result.setResultCallback(new ResultCallback<LocationSettingsResult>() {
-            @Override
-            public void onResult(LocationSettingsResult locationSettingsResult) {
-                final Status status = locationSettingsResult.getStatus();
-                final LocationSettingsStates states= locationSettingsResult.getLocationSettingsStates();
-                switch (status.getStatusCode()) {
-                    case LocationSettingsStatusCodes.SUCCESS:
-                        break;
-                    case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
-                        // Location settings are not satisfied, but this can be fixed
-                        // by showing the user a dialog.
-                        try {
-                            // Show the dialog by calling startResolutionForResult(),
-                            // and check the result in onActivityResult().
-                            status.startResolutionForResult(
-                                    MainActivity.this,
-                                    REQUEST_CHECK_SETTINGS);
-                        } catch (IntentSender.SendIntentException e) {
-                            // Ignore the error.
-                        }
-                        break;
-                    case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-                        break;
-                }
-            }
-        });
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        switch (requestCode) {
-            // Check for the integer request code originally supplied to startResolutionForResult().
-            case REQUEST_CHECK_SETTINGS:
-                switch (resultCode) {
-                    case Activity.RESULT_OK:
-                        startLocationUpdates();
-                        break;
-                    case Activity.RESULT_CANCELED:
-                        break;
-                }
-                break;
-        }
-    }
 
     @Override
     protected void onStart() {
@@ -261,24 +204,59 @@ public class MainActivity extends AppCompatActivity implements
 
     public void startGeofenceTrack(View view) {
         isAddressLocated = false;
-        if (!mGoogleApiClient.isConnected()) {
-            Toast.makeText(this, "Address not located or No Internet Connection", Toast.LENGTH_LONG).show();
-            return;
-        }
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
+            // Location Permission not granted, need to request the permission.
+            requestLocationPermission();
+
+
             Toast.makeText(this, "No Internet Connection or Location Permission not granted", Toast.LENGTH_LONG).show();
             return;
         }
+        if (!mGoogleApiClient.isConnected()) {
+            Toast.makeText(this, "Address not located or No Internet Connection", Toast.LENGTH_LONG).show();
+            return;
 
-        LocationServices.GeofencingApi.addGeofences(mGoogleApiClient,
-                getGeofencingRequest(), getGeofencePendingIntent()).setResultCallback(this);
+        }
+        /* else if (!isAddressLocated) {
+            Toast.makeText(this, "No Destination Added", Toast.LENGTH_LONG).show();
+        } */ else{
+            LocationServices.GeofencingApi.addGeofences(mGoogleApiClient,
+                    getGeofencingRequest(), getGeofencePendingIntent()).setResultCallback(this);
+        }
+    }
+    private void requestLocationPermission(){
+        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)){
+            new AlertDialog.Builder(this)
+                    .setTitle("Permission Required")
+                    .setMessage("Sleepy Traveller needs to access your current location to work")
+                    .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            ActivityCompat.requestPermissions(MainActivity.this,
+                                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                                    REQUEST_LOCATION);
+                        }
+                    })
+                    .setIcon(R.drawable.icon_alert)
+                    .show();
+        } else{
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                    REQUEST_LOCATION);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == REQUEST_LOCATION){
+            if (grantResults.length ==  1 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
+                Toast.makeText(this, "Permission Granted", Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, "Permission Not Granted", Toast.LENGTH_LONG).show();
+            }
+
+        } else {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        }
     }
 
     public void stopGeofenceTrack(View view){
@@ -286,9 +264,10 @@ public class MainActivity extends AppCompatActivity implements
         if (!mGoogleApiClient.isConnected()) {
             Toast.makeText(this, "Address not located or No Internet Connection", Toast.LENGTH_LONG).show();
             return;
+        } else {
+            map.clear();
+            LocationServices.GeofencingApi.removeGeofences(mGoogleApiClient, getGeofencePendingIntent()).setResultCallback(this);
         }
-        map.clear();
-        LocationServices.GeofencingApi.removeGeofences(mGoogleApiClient, getGeofencePendingIntent()).setResultCallback(this);
     }
     private PendingIntent getGeofencePendingIntent(){
         if (mGeofencePendingIntent != null){
@@ -308,15 +287,17 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     public void onConnected(Bundle bundle) {
-        if (mLastLocation == null) {
-            getUserCurrentLocation();
-            startLocationUpdates();
-        }
-        else {
-            startLocationUpdates();
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestLocationPermission();
+        } else {
+            if (mLastLocation == null) {
+                getUserCurrentLocation();
+                startLocationUpdates();
+            } else {
+                startLocationUpdates();
+            }
         }
     }
-
 
     @Override
     public void onConnectionSuspended(int i) {
@@ -337,7 +318,7 @@ public class MainActivity extends AppCompatActivity implements
             //                                          int[] grantResults)
             // to handle the case where the user grants the permission. See the documentation
             // for ActivityCompat#requestPermissions for more details.
-            return;
+            requestLocationPermission();
         }
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
         updateUI(mLastLocation);
@@ -352,8 +333,8 @@ public class MainActivity extends AppCompatActivity implements
             //                                          int[] grantResults)
             // to handle the case where the user grants the permission. See the documentation
             // for ActivityCompat#requestPermissions for more details.
+            requestLocationPermission();
 
-            return;
         }
         LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
     }
@@ -367,6 +348,9 @@ public class MainActivity extends AppCompatActivity implements
             isAddressLocated=true;
             locateOnMap(data.getDouble("latitude"), data.getDouble("longitude"));
             populateGeofence(data.getDouble("latitude"), data.getDouble("longitude"));
+            btnStart.setEnabled(true);
+            btnStart.setAlpha(1f);
+            btnStart.setClickable(true);
         }
     }
 
@@ -385,7 +369,7 @@ public class MainActivity extends AppCompatActivity implements
 
     protected void populateGeofence(double latitude, double longitude){
         mGeofenceList.add(new Geofence.Builder().setRequestId(Constants.PACKAGE_NAME)
-                .setCircularRegion(latitude, longitude, 3000) //building it for 3000 mts
+                .setCircularRegion(latitude, longitude, 500) //building it for 3000 mts
                 .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
                 .setExpirationDuration(24 * 60 * 60 * 1000)
                 .build());
@@ -437,7 +421,11 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public void onResult(Status status) {
         if (status.isSuccess()){
-            mGeofenceAdded = !mGeofenceAdded;
+            if (mGeofenceAdded){
+                mGeofenceAdded=false;
+            } else{
+                mGeofenceAdded=true;
+            }
             SharedPreferences.Editor editor = mSharedPreferences.edit();
             editor.putBoolean(Constants.GEOFENCE_ADDED_KEY, mGeofenceAdded);
             editor.apply();
