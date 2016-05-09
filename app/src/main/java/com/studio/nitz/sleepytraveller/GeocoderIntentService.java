@@ -34,14 +34,15 @@ public class GeocoderIntentService extends IntentService {
             listAddress=geocoder.getFromLocationName(address,1);
             if (listAddress==null || listAddress.size() == 0){
                 resultReceiver.send(0, null);
+            } else {
+                Address location = listAddress.get(0);
+                double latitude = location.getLatitude();
+                double longitude = location.getLongitude();
+                Bundle resultBundle = new Bundle();
+                resultBundle.putDouble("latitude", latitude);
+                resultBundle.putDouble("longitude", longitude);
+                resultReceiver.send(1, resultBundle);
             }
-            Address location = listAddress.get(0);
-            double latitude = location.getLatitude();
-            double longitude = location.getLongitude();
-            Bundle resultBundle = new Bundle();
-            resultBundle.putDouble("latitude", latitude);
-            resultBundle.putDouble("longitude", longitude);
-            resultReceiver.send(1, resultBundle);
         } catch (IOException e) {
             e.printStackTrace();
         }

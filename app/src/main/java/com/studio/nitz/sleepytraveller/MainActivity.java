@@ -10,8 +10,10 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -87,7 +89,6 @@ public class MainActivity extends AppCompatActivity implements
         mGeofenceAdded = mSharedPreferences.getBoolean(Constants.GEOFENCE_ADDED_KEY, false);
         setButtonsEnabledState();
         map = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map)).getMap();
-        buildGoogleApiClient();
         addressTxt = (EditText) findViewById(R.id.addressTxt);
         addressTxt.setOnTouchListener(new View.OnTouchListener() {
             @Override
@@ -101,6 +102,7 @@ public class MainActivity extends AppCompatActivity implements
         btnStart.setEnabled(false);
         btnStart.setAlpha(.3f);
         btnStart.setClickable(false);
+        buildGoogleApiClient();
     }
 
     @Override
@@ -141,7 +143,6 @@ public class MainActivity extends AppCompatActivity implements
         alert = builder.create();
         alert.show();
         return true;
-
     }
 
     protected synchronized void buildGoogleApiClient() {
@@ -162,28 +163,23 @@ public class MainActivity extends AppCompatActivity implements
         mLocationRequest.setFastestInterval(Constants.FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS);
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
     }
-
-
     @Override
     protected void onStart() {
         mGoogleApiClient.connect();
         super.onStart();
     }
-
     @Override
     protected void onResume() {
         super.onResume();
-        if (mGoogleApiClient.isConnected()) {
+        if (mGoogleApiClient.isConnected() && (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
             startLocationUpdates();
         }
     }
-
     @Override
     protected void onDestroy() {
         mGoogleApiClient.disconnect();
         super.onDestroy();
     }
-
     public void findAddressOnMap(View view) {
         if (view != null) {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -201,16 +197,12 @@ public class MainActivity extends AppCompatActivity implements
             startGeocodingIntent(addressInput);
         }
     }
-
     public void startGeofenceTrack(View view) {
         isAddressLocated = false;
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             // TODO: Consider calling
             // Location Permission not granted, need to request the permission.
             requestLocationPermission();
-
-
-            Toast.makeText(this, "No Internet Connection or Location Permission not granted", Toast.LENGTH_LONG).show();
             return;
         }
         if (!mGoogleApiClient.isConnected()) {
@@ -218,40 +210,61 @@ public class MainActivity extends AppCompatActivity implements
             return;
 
         }
-        /* else if (!isAddressLocated) {
-            Toast.makeText(this, "No Destination Added", Toast.LENGTH_LONG).show();
-        } */ else{
+        else{
             LocationServices.GeofencingApi.addGeofences(mGoogleApiClient,
                     getGeofencingRequest(), getGeofencePendingIntent()).setResultCallback(this);
         }
     }
     private void requestLocationPermission(){
-        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)){
-            new AlertDialog.Builder(this)
-                    .setTitle("Permission Required")
-                    .setMessage("Sleepy Traveller needs to access your current location to work")
-                    .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int which) {
-                            ActivityCompat.requestPermissions(MainActivity.this,
-                                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                                    REQUEST_LOCATION);
-                        }
-                    })
-                    .setIcon(R.drawable.icon_alert)
-                    .show();
-        } else{
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                    REQUEST_LOCATION);
-        }
+        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                REQUEST_LOCATION);
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         if (requestCode == REQUEST_LOCATION){
             if (grantResults.length ==  1 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
-                Toast.makeText(this, "Permission Granted", Toast.LENGTH_LONG).show();
-            } else {
-                Toast.makeText(this, "Permission Not Granted", Toast.LENGTH_LONG).show();
+                return;
+            } else if (grantResults[0] ==  PackageManager.PERMISSION_DENIED){
+                //should show and explanation and ask again
+                if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)){
+                    new AlertDialog.Builder(this)
+                            .setTitle("Permission Required")
+                            .setMessage("Sleepy Traveller is designed to trigger an alert as soon as you enter a chosen region.\n\n " +
+                                    "To do so, this app requires permission to monitor your current location, even while it is in background.\n\n" +
+                                    "Your location data does not and will never leave this device and is only used for internal calculations. ")
+                            .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int which) {
+                                    dialog.dismiss();
+                                }
+                            })
+                            .setIcon(R.drawable.ic_location)
+                            .show();
+                } else {
+                    new AlertDialog.Builder(this)
+                            .setTitle("Permission Issue")
+                            .setMessage("Permission was not granted. Go to settings first to make the changes.")
+                            .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int which) {
+                                    final Intent i = new Intent();
+                                    i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                    i.addCategory(Intent.CATEGORY_DEFAULT);
+                                    i.setData(Uri.parse("package:" + "com.studio.nitz.sleepytraveller"));
+                                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                    i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+                                    i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+                                    startActivity(i);
+                                }
+                            })
+                            .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    dialog.dismiss();
+                                }
+                            })
+                            .setIcon(R.drawable.ic_location)
+                            .show();
+                }
             }
 
         } else {
@@ -311,13 +324,6 @@ public class MainActivity extends AppCompatActivity implements
 
     private void getUserCurrentLocation() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
             requestLocationPermission();
         }
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
@@ -326,13 +332,6 @@ public class MainActivity extends AppCompatActivity implements
 
     private void startLocationUpdates() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
             requestLocationPermission();
 
         }
@@ -358,12 +357,12 @@ public class MainActivity extends AppCompatActivity implements
         LatLng latLng = new LatLng(latitude, longitude);
         map.addMarker(new MarkerOptions().position(latLng).icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
         map.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-        map.animateCamera(CameraUpdateFactory.zoomTo(14), 2000, null);
+        map.animateCamera(CameraUpdateFactory.zoomTo(13), 2000, null);
         CircleOptions circleOptions = new CircleOptions()
                                             .center(latLng)
                                             .fillColor(0x40ff0000)
                                             .strokeColor(Color.TRANSPARENT)
-                                            .radius(1000);
+                                            .radius(1600);
         map.addCircle(circleOptions);
     }
 
