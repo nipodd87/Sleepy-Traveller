@@ -89,6 +89,7 @@ public class MainActivity extends AppCompatActivity implements
         mGeofenceAdded = mSharedPreferences.getBoolean(Constants.GEOFENCE_ADDED_KEY, false);
         setButtonsEnabledState();
         map = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map)).getMap();
+        map.getUiSettings().setZoomControlsEnabled(true);
         addressTxt = (EditText) findViewById(R.id.addressTxt);
         addressTxt.setOnTouchListener(new View.OnTouchListener() {
             @Override

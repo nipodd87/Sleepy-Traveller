@@ -21,7 +21,7 @@ public class AlarmReceiver extends Activity {
     private PowerManager.WakeLock mWakeLock;
     public int userSelectedTone;
     private Vibrator vibrator;
-    private long[] pattern = {0, 100, 1000};
+    private long[] pattern = {0, 4000, 1000};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
