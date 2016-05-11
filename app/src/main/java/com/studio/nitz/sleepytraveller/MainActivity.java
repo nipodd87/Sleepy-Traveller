@@ -244,7 +244,7 @@ public class MainActivity extends AppCompatActivity implements
                 } else {
                     new AlertDialog.Builder(this)
                             .setTitle("Permission Issue")
-                            .setMessage("Permission was not granted. Go to settings first to make the changes.")
+                            .setMessage("Pending Location Permission. Go to settings first to make the changes.")
                             .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int which) {
                                     final Intent i = new Intent();
