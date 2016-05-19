@@ -358,7 +358,7 @@ public class MainActivity extends AppCompatActivity implements
         LatLng latLng = new LatLng(latitude, longitude);
         map.addMarker(new MarkerOptions().position(latLng).icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
         map.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-        map.animateCamera(CameraUpdateFactory.zoomTo(13), 2000, null);
+        map.animateCamera(CameraUpdateFactory.zoomTo(13), 1000, null);
         CircleOptions circleOptions = new CircleOptions()
                                             .center(latLng)
                                             .fillColor(0x40ff0000)

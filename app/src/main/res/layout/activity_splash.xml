@@ -2,7 +2,7 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/sleepy_traveller_background"
+    android:background="@drawable/icon_sleepy_traveller_background"
     >
 
     <TextView
@@ -10,7 +10,6 @@
         android:layout_height="wrap_content"
         android:text="1.0v"
         android:textColor="#fff"
-        android:textStyle="bold"
         android:textSize="20dp"
         android:layout_centerHorizontal="true"
         android:layout_alignParentBottom="true"

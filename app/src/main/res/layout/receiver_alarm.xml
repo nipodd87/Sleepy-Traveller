@@ -2,20 +2,16 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/sleepy_traveller_background"
+    android:background="@drawable/icon_sleepy_traveller_background"
     >
     <Button
         android:id="@+id/btnStopAlarm"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="50dp"
+        android:onClick="stopAlarm"
+        android:background="#0089E3"
+        android:text="Got It!"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:textColor="#fff"
-        android:textStyle="bold"
-        android:textSize="18dp"
-        android:text="STOP"
-        android:onClick="stopAlarm"
-        android:background="@drawable/textview_stop"
-        />
+        android:layout_marginBottom="70dp" />
 </RelativeLayout>
